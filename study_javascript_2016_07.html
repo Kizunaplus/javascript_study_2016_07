@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=500">
+	<title></title>
+<script   src="https://code.jquery.com/jquery-1.12.4.min.js"   integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ="   crossorigin="anonymous"></script>
+<script>
+
+/**
+* ベースクラス
+*/
+class BaseElement {
+	/**
+	  * コンストラクタ:s:w
+	*/
+	constructor(panel, x, y, width, height) {
+		this._panel = panel;
+		this._color = panel.callPlugin('generate_color', this);
+		this._borderColor = panel.callPlugin('generate_border_color', this);
+		this._x = x;
+		this._initX = x;
+		this._y = y;
+		this._initY = y;
+		this._width = width;
+		this._height = height;
+		this._visible = true;
+	}
+
+	/**
+	  * X座標取得
+	*/
+	get X() {
+		return this._x;
+	}
+
+	/**
+	  * X座標取得
+	*/
+	set X(x) {
+		this._x = x;
+	}
+
+	/**
+	  * Y座標取得
+	*/
+	get Y() {
+		return this._y;
+	}
+
+	/**
+	  * 横幅取得
+	*/
+	get Width() {
+		return this._width;
+	}
+	/**
+	  * 高さ取得
+	*/
+	get Height() {
+		return this._height;
+	}
+
+	/**
+	  * 色取得
+	*/
+	get Color() {
+		return this._color;
+	}
+
+	/**
+	  * 色取得
+	*/
+	get BorderColor() {
+		return this._borderColor;
+	}
+
+	/**
+	  * 表示状態取得
+	*/
+	get Visible() {
+		return this._visible;
+	}
+	
+	/**
+	  * 表示状態取得
+	*/
+	set Visible(val) {
+		this._visible = val;
+	}
+
+	/**
+	  * 移動
+	*/
+	move (x, y) {
+		this._x += x;
+		this._y += y;
+	}
+
+	/**
+	  * 初期位置に配置
+	*/
+	reset() {
+		this._x = this._initX;
+		this._y = this._initY;
+	}
+
+	/**
+	  * ボールが自身の範囲内かチェック
+	*/
+	contains(element) {
+		if (this.Visible == false) {
+			// 削除されたブロック
+			return false;
+		}
+		
+		if (this.X < element.X && element.X < this.X + this.Width &&
+				this.Y < element.Y && element.Y < this.Y + this.Height) {
+			// 範囲内
+			return true;
+		}
+		// 範囲外
+		return false;
+	}
+
+	/**
+	  * 描画処理
+	*/
+	draw(ctx, mode) {
+		if (this.Visible == false) {
+			// 削除されたアイテム
+			return;
+		}
+
+		ctx.beginPath();
+		ctx.strokeStyle= this.BorderColor;
+		ctx.fillStyle= this.Color;
+		ctx.lineWidth = 2;
+		if (mode == 1) {
+			ctx.fillRect(this.X, this.Y, this.Width, this.Height);
+			ctx.strokeRect(this.X, this.Y, this.Width, this.Height);
+		} else if (mode == 2) {
+			ctx.arc(this.X, this.Y, this.Width, 0, Math.PI * 2, false);
+			ctx.fill();
+			ctx.stroke();
+		}
+	}
+}
+
+/**
+* ボールクラス
+*/
+class Ball extends BaseElement {
+	/**
+	  * コンストラクタ:s:w
+	*/
+	constructor(panel, x, y, size) {
+		super(panel, x, y, size, size);
+	}
+
+	/**
+	  * ボールの描画
+	*/
+	draw(ctx) {
+		super.draw(ctx, 2);
+	}
+}
+
+/**
+  * ブロッククラス
+*/
+class Block extends BaseElement {
+	/**
+	  * コンストラクタ
+	*/
+	constructor(panel, x, y, width, height) {
+		super(panel, x, y, width, height);
+	}
+
+	/**
+	  * ボールとの衝突判定
+	*/
+	isHit(ball) {
+		return this._panel.callPlugin('is_hit_block_and_ball', this, ball);
+	}
+
+	/**
+	  * 衝突した際のブロック削除処理
+	*/
+	setHit(isHit) {
+		this.Visible = !isHit;
+	}
+
+	/**
+	  * ブロックの描画
+	*/
+	draw(ctx) {
+		super.draw(ctx, 1);
+	}
+}
+
+/**
+  * パドル（ユーザ操作バー)クラス
+*/
+class Paddle extends BaseElement {
+
+	/**
+	  * ボールとの衝突判定
+	*/
+	isHit(ball) {
+		return this._panel.callPlugin('is_hit_block_and_ball', this, ball);
+	}
+
+	/**
+	  * パドルの描画
+	*/
+	draw(ctx) {
+		super.draw(ctx, 1);
+	}
+
+}
+
+/**
+  * 情報表示クラス
+*/
+class InfoElement extends BaseElement {
+	/**
+	  * コンストラクタ
+	*/
+	constructor(panel, index) {
+		super(panel, panel.width - 150, 5 + 20 * (index - 1), 140, 20);
+	}
+
+	/**
+	  * 描画処理
+	*/
+	draw(ctx, message) {
+		ctx.beginPath();
+		ctx.font = canvasFontStyle;
+		ctx.lineWidth = 1;
+		ctx.strokeStyle= this.Color;
+		var tml = ctx.measureText(message);
+		ctx.strokeRect(this.X, this.Y, this.Width, this.Height);
+		ctx.strokeText(message, this.X + this.Width - tml.width - 5, this.Y + this.Height - 2);
+	}
+
+}
+
+class Life extends InfoElement {
+	/**
+	  * コンストラクタ
+	*/
+	constructor (panel, lifePoint) {
+		super(panel, 1);
+		this._lifePoint = lifePoint;
+	}
+
+	/**
+	  * ライフを取得
+	*/
+	get Life() {
+		return this._lifePoint;
+	}
+
+	/**
+	  * 死亡処理
+	*/
+	dead() {
+		this._lifePoint--;
+	}
+
+	/**
+	  * ゲームオーバ判定
+	*/
+	isGameOver() {
+		return this._lifePoint <= 0;
+	}
+
+	/**
+	  * 描画処理
+	*/
+	draw(ctx) {
+		super.draw(ctx, this._lifePoint + 'Life');
+	}
+}
+
+/**
+  * 得点クラス
+*/
+class Score extends InfoElement {
+
+	/**
+	  * コンストラクタ
+	*/
+	constructor (panel, scorePoint) {
+		super(panel, 2);
+		this._scorePoint = scorePoint;
+	}
+
+	/**
+	  * 得点の取得
+	*/
+	get Score() {
+		return this._scorePoint;
+	}
+
+	/**
+	  * 得点の加算
+	*/
+	addScore (block) {
+		this._scorePoint += this._panel.callPlugin('calc_score_point', block);
+	}
+
+	/**
+	  * 描画処理
+	*/
+	draw(ctx) {
+		super.draw(ctx, this._scorePoint + 'Point');
+	}
+}
+
+/**
+  * ゲームエリアクラス
+*/
+class Panel {
+	/**
+	  * コンストラクタ
+	*/
+	constructor (elem, width, height, pluginSetting) {
+		this._elem = elem;
+		this._width = width;
+		this._height = height;
+		this._message = null;
+		this._plugins = pluginSetting;
+		if ('generate_color' in this._plugins == false) {
+			this._plugins['generate_color'] = 'defaultGenerateColor(arg1);';
+		}
+		if ('generate_border_color' in this._plugins == false) {
+			this._plugins['generate_border_color'] = 'defaultGenerateBorderColor(arg1);';
+		}
+		if ('create_blocks' in this._plugins == false) {
+			this._plugins['create_blocks'] = 'defaultCreateBlocks(arg1, arg1._width, arg1._height);';
+		}
+		if ('calc_score_point' in this._plugins == false) {
+			this._plugins['calc_score_point'] = 'defaultCalcScorePoint(arg1);';
+		}
+		if ('is_hit_block_and_ball' in this._plugins == false) {
+			this._plugins['is_hit_block_and_ball'] = 'defaultIsHitBlockAndBall(arg1, arg2);';
+		}
+		if ('get_status_message' in this._plugins == false) {
+			this._plugins['get_status_message'] = 'defaultGetStatusMessage(arg1, arg2);';
+		}
+		this.create();
+	}
+
+	get elem () {
+		return this._elem;
+	}
+	get width() {
+		return this._width;
+	}
+	get height() {
+		return this._height;
+	}
+
+	create() {
+		// バーの作成
+		this._paddle = new Paddle(this, (this._width / 2) - (this._width / 18), this._height - defaultPaddleHeight - 10, this._width / 9, defaultPaddleHeight);
+		// ボールの作成
+		this._ball = new Ball(this, (this._width / 2) - defaultBallSize, this._height - defaultBallSize - 10 - defaultPaddleHeight, defaultBallSize);
+		// ライフの作成
+		this._life = new Life(this, defaultLifePoint);
+		// スコアの作成
+		this._score = new Score(this, 0);
+		// ブロックの作成
+		this._blocks = this.callPlugin('create_blocks', this);
+		// ゲームルール
+		this._rule = new GameRule(this, 0, 0, this._width, this._height);
+	}
+
+	draw() {
+		if (this._ctx === undefined) {
+			/* canvas要素のノードオブジェクト */
+			var canvas = this._elem.get(0);
+			/* canvas要素の存在チェックとCanvas未対応ブラウザの対処 */
+			if ( ! canvas || ! canvas.getContext ) {
+				console.log("Canvas 未対応ブラウザ");
+				return false;
+			}
+			this._ctx = canvas.getContext('2d');
+		}
+		this._ctx.beginPath();
+		this._ctx.clearRect(0, 0, this._elem.width(), this._elem.height());
+
+		this._life.draw(this._ctx);
+		this._score.draw(this._ctx);
+		if (this._blocks != null) {
+			for (var i = 0; i < this._blocks.length; i++) {
+				this._blocks[i].draw(this._ctx);
+			}
+		}
+		this._paddle.draw(this._ctx);
+		this._ball.draw(this._ctx);
+
+		if (this._message != null) {
+			this._ctx.beginPath();
+			this._ctx.font = canvasFontStyle;
+			this._ctx.lineWidth = 1;
+			this._ctx.strokeStyle= 'black';
+			var tml = this._ctx.measureText(this._message);
+			this._ctx.strokeText(this._message, this._width /2 - tml.width / 2, this._height / 2);
+		}
+	}
+
+	move() {
+		if (this._rule.action(this._ball, this._blocks, this._paddle, this._life, this._score) === false) {
+			this._message = this.callPlugin('get_status_message', this, 2);
+			if (this._life.isGameOver() === true) {
+				this._message = this.callPlugin('get_status_message', this, 1);
+				gameEnd();
+				return;
+			}
+		}
+
+		if (this._blocks != null) {
+			for (var i = 0; i < this._blocks.length; i++) {
+				//this._blocks[i].draw();
+			}
+		}
+	}
+
+	movePaddle(x) {
+		if (Number.isNaN(x)) {
+			return;
+		}
+		this._paddle.X = Math.max(Math.min(this._paddle.X + x, this._width - this._paddle.Width), 0);
+	}
+
+	action() {
+		this.move();
+		this.draw();
+	}
+
+	shotBall() {
+		this._message = "";
+		this._rule.shotBall();
+	}
+
+	callPlugin(functionName,arg1,arg2,arg3) {
+		return plugin.callPlugin(functionName, arg1, arg2, arg3);
+	}
+}
+
+class GameRule {
+	constructor(panel, x, y, width, height) {
+		this._panel = panel;
+		this._x = x;
+		this._y = y;
+		this._width = width;
+		this._height = height;
+	}
+
+	action(ball, blocks, paddle, lifePoint, score) {
+		ball.move(this._x, this._y);
+
+		if (ball.X < 0 && this._x < 0 || ball.X >= this._width && this._x > 0) {
+			// 壁跳ね返り
+			this._x *= -1;
+		}
+		if (paddle.isHit(ball) === true) {
+			// バー当たり判定
+			this._x *= -1;
+			this._y *= -1;
+			if (ball.X <= paddle.X + paddle.Width / 3 * 1) this._x = -6;
+			else if (ball.X >= paddle.X + paddle.Width / 3 * 2) this._x = 6;
+			else if (Math.abs(ball.X) === 6) this._x = (ball.X * 2 / 3) | 0;
+		}
+		if (ball.Y < 0) {
+			// 天井跳ね返り
+			this._y *= -1;
+		}
+		if (ball.Y >= this._height) {
+			lifePoint.dead();
+			this._x = 0;
+			this._y = 0;
+			ball.reset();
+			return false;
+		}
+
+		var block = null;
+		if (blocks != null) {
+			for (var i = 0; i < blocks.length; i++) {
+				if (this._panel.callPlugin('is_hit_block_and_ball', blocks[i], ball) === true) {
+					block = blocks[i];
+					break;
+				}
+			}
+		}
+		if (block != null) {
+			// ブロックの削除
+			this._y *= -1;
+			block.setHit(true);
+	
+			if (this._x < 0 && (ball.X % 32 < 10 || ball.X % 32 > 22)) {
+				// 跳ね返り
+				this._x *= -1;
+			}
+			if (this._x > 0 && ((ball.X + 12) % 32 < 10 || (ball.X + 12) % 32 > 22)) {
+				// 跳ね返り
+				this._x *= -1;
+			}
+			score.addScore(block);
+		}
+	}
+	
+	shotBall() {
+		if (this._x == 0 && this._y == 0) {
+			console.log("ball shotting");
+			this._x = -4;
+			this._y = -3;
+		}
+	}
+}
+
+class GamePlugin {
+	/**
+	  * コンストラクタ
+	*/
+	constructor () {
+		this._plugins = [];
+		this._plugins['generate_color'] = 'this.defaultGenerateColor(arg1);';
+		this._plugins['generate_border_color'] = 'this.defaultGenerateBorderColor(arg1);';
+		this._plugins['create_blocks'] = 'this.defaultCreateBlocks(arg1, arg1._width, arg1._height);';
+		this._plugins['calc_score_point'] = 'this.defaultCalcScorePoint(arg1);';
+		this._plugins['is_hit_block_and_ball'] = 'this.defaultIsHitBlockAndBall(arg1, arg2);';
+		this._plugins['get_status_message'] = 'this.defaultGetStatusMessage(arg1, arg2);';
+	}
+
+	/**
+	  * プラグイン機能呼び出し
+	*/
+	callPlugin(functionName, arg1, arg2, arg3) {
+
+		var ret = null;
+		try {
+			var functionExe = this._plugins[functionName];
+			if (functionExe != undefined) {
+				ret = eval(functionExe);
+			}
+		} catch (e) {
+			console.log(e);
+		}
+		return ret;
+	}
+	
+	/**
+	  * プラグイン機能登録
+	*/
+	registPlugin(functionName, functionExec) {
+		this._plugins[functionName] = functionExec;
+	}
+
+	/**
+	  * プラグイン機能の機能確認
+	*/
+	checkPlugin(functionName, functionExec) {
+		try {
+			var arg1 = '';
+			var arg2 = '';
+			var arg3 = '';
+			eval(functionExec);
+		} catch (e) {
+			console.log(e);
+			$("#error_message").html(functionName + ' : ' + e.message);
+			return false;
+		}
+		return true;
+	}
+
+	defaultGenerateColor(item) {
+		if (item instanceof Ball) {
+			return "rgba(192, 80, 77, 0.7)";
+		} else if (item instanceof Paddle) {
+			return "rgba(155, 187, 89, 0.7)";
+		}
+		return "rgba(128, 100, 162, 0.7)";
+	}
+
+	defaultGenerateBorderColor(item) {
+		if (item instanceof Ball) {
+			return "rgba(172, 60, 57, 0.7)";
+		} else if (item instanceof Paddle) {
+			return "rgba(135, 167, 69, 0.7)";
+		}
+		return "rgba(100, 80, 142, 0.7)";
+	}
+
+	defaultCalcScorePoint(block) {
+		return 1;
+	}
+
+	defaultCreateBlocks(panel, width, height) {
+		return [ new Block(panel, 100, 300, 100, 15)];
+	}
+
+	defaultIsHitBlockAndBall(block, ball) {
+		return block.contains(ball);
+	}
+	defaultGetStatusMessage(panel, status) {
+		var message = "";
+		if (status == 1) {
+			message = "Game over.";
+		} else if (status == 2) {
+			message = "You loose.";
+		} else if (status == 3) {
+			message = "Game clear.";
+		}
+		return message;
+	}
+}
+var plugin = new GamePlugin();
+
+function gameEnd() {
+	if (gameStartThread != undefined) {
+		// 以前に動作していた処理を停止する。
+		clearInterval(gameStartThread);
+		gameStartThread = undefined;
+	}
+}
+
+
+var canvasFontStyle = "18px Arial";
+var currentPanel = null;
+var defaultBallSize = 5;
+var defaultPaddleHeight = 10;
+var defaultLifePoint = 3;
+var gameStartThread;
+var pluginSetting = [];
+function gameStart() {
+	var field = $('#gameField');
+	var fieldWidth = 500;
+	var fieldHeight = 500;
+
+	field.attr({'width' : fieldWidth + 'px', 'height' : fieldHeight + 'px'});
+	field.css({'width' : fieldWidth + 'px', 'height' : fieldHeight + 'px'});
+	currentPanel = new Panel($('#gameField'), fieldWidth, fieldHeight, pluginSetting);
+
+	gameEnd();
+
+	// 1秒間に30コマで表示を行う
+	gameStartThread = setInterval(function(){currentPanel.action()}, 1000 / 60);
+}
+
+function updatePluginSetting() {
+
+	var elemName = 'colorSetting';
+	var funcName = 'generate_color';
+	if ($("#" + elemName).val() != '') {
+		var func_data = 'function a1(item){' + $("#" + elemName).val() + '}a1(arg1);';
+		if (plugin.checkPlugin(funcName, func_data) == true) {
+			plugin.registPlugin(funcName, func_data);
+		}
+	}
+
+	elemName = 'scoreSetting';
+	funcName = 'calc_score_point';
+	if ($("#" + elemName).val() != '') {
+		var func_data = 'function a2(block){var score = 1;' + $("#" + elemName).val() + 'return score;}a2(arg1);';
+		if (plugin.checkPlugin(funcName, func_data) == true) {
+			plugin.registPlugin(funcName, func_data);
+		}
+	}
+
+	elemName = 'blockSetting';
+	funcName = 'create_blocks';
+	if ($("#" + elemName).val() != '') {
+		var func_data = 'function a3(panel, width, height){var blocks = [' + $("#" + elemName).val() + '];return blocks;}a3(arg1, arg2, arg3);';
+		if (plugin.checkPlugin(funcName, func_data) == true) {
+			plugin.registPlugin(funcName, func_data);
+		}
+	}
+	elemName = 'hitSetting';
+	funcName = 'is_hit_block_and_ball';
+	if ($("#" + elemName).val() != '') {
+		var func_data = 'function a4(ball, block){var hit = true;' + $("#" + elemName).val() + ';return hit;}a4(arg1, arg2);';
+		if (plugin.checkPlugin(funcName, func_data) == true) {
+			plugin.registPlugin(funcName, func_data);
+		}
+	}
+
+	var data = {
+		'color' : $('#colorSetting').val(),
+		'score' : $('#scoreSetting').val(),
+		'block' : $('#blockSetting').val(),
+		'hit' : $('#hitSetting').val()
+	};
+	console.log(JSON.stringify(data));
+	localStorage["setting"]   = JSON.stringify(data);
+	
+	eval($('pluginSetting').val());
+}
+
+var isEditMode = false;
+var oldMousePosition = 0;
+$(function() {
+	var field = $('#gameField');
+	$(document).on('mousemove touchstart', function(e) {
+		if (currentPanel == null) {
+			return;
+		}
+
+		currentPanel.movePaddle((e.clientX - oldMousePosition) / 1.5);
+		oldMousePosition = e.clientX;
+	});
+	$(document).on('touchmove', function(e) {
+		if (isEditMode == true) {
+			return;
+		}
+		event.preventDefault();                     // ページが動くのを止める
+		var pageX = event.changedTouches[0].pageX; // X 座標の位置
+		if (currentPanel == null) {
+			return;
+		}
+
+		currentPanel.movePaddle((pageX - oldMousePosition) / 1.5);
+		oldMousePosition = pageX;
+	});
+	$(field).on('click', function() {
+		if (currentPanel == null || gameStartThread == null) {
+			gameStart();
+		} else {
+			currentPanel.shotBall();
+		}
+	});
+	/* canvas要素のノードオブジェクト */
+	var canvas = field.get(0);
+	/* canvas要素の存在チェックとCanvas未対応ブラウザの対処 */
+	if ( ! canvas || ! canvas.getContext ) {
+		console.log("Canvas 未対応ブラウザ");
+		return false;
+	}
+	var data_string = localStorage["setting"];
+	if (data_string != undefined) {
+		var data = JSON.parse(data_string);
+		$('#colorSetting').val(data['color']);
+		$('#scoreSetting').val(data['score']);
+		$('#blockSetting').val(data['block']);
+		$('#hitSetting').val(data['hit']);
+	}
+	
+
+	var message = 'Game Start.';
+	ctx = canvas.getContext('2d');
+	ctx.beginPath();
+	ctx.font = canvasFontStyle;
+	ctx.lineWidth = 1;
+	ctx.strokeStyle= 'black';
+	var tml = ctx.measureText(message);
+	ctx.strokeText(message, field.width() /2 - tml.width / 2, field.height() / 2);
+
+});
+</script>
+</head>
+<body style="font-size:16px;">
+		<canvas id="gameField" style="border:1px solid black;"></canvas><br>
+		<input type="button" onclick="isEditMode = !isEditMode;" value="Edit"/><br>
+		<input type="button" onclick="updatePluginSetting();" value="Update Setting"/><br>
+		<label id="error_message" style="color:red"></label><br>
+		■配色設定<br>
+		<textarea id="colorSetting" style="width:100%" rows='12' placeholder="使用できる変数
+item：色を設定する対象
+実装例)
+if (item instanceof Block) {
+  color = 'argb(0,0,0,0.7)'; // 黒 半透明(0.7)
+}"></textarea><br>
+		■スコア設定<br>
+		<textarea id="scoreSetting" style="width:100%" rows='12' placeholder='使用できる変数
+block：壊したBlock
+具体例)
+score = 5; // 1ブロック5点'></textarea><br>
+		■ブロック配置設定<br>
+		<textarea id="blockSetting" style="width:100%" rows='12' placeholder="使用できる変数
+panel：ゲームの領域 (Blockを生成する際に必要)
+width：ゲーム画面の幅 (Blockの配置を検討するのに必要)
+height：ゲーム画面の高さ (Blockの配置を検討するのに必要)
+具体例)
+new Block(panel, 10, 10, 100, 15),
+new Block(panel, 10, 30, 100, 15)
+"></textarea><br>
+		■あたり判定設定<br>
+		<textarea id="hitSetting" style="width:100%" rows='12' placeholder="使用できる変数
+ball：衝突するボール
+block：衝突するブロック
+具体例）
+hit = true;"></textarea><br>
+		■プラグイン設定<br>
+		<textarea id="pluginSetting" style="width:100%" rows='12' placeholder='処理を理解して、他の機能を作成してみよう'></textarea><br>
+</body>
+</html>

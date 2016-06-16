@@ -16,8 +16,10 @@ class BaseElement {
 	*/
 	constructor(panel, x, y, width, height) {
 		this._panel = panel;
-		this._color = panel.callPlugin('generate_color', this);
-		this._borderColor = panel.callPlugin('generate_border_color', this);
+		if (panel != null) {
+			this._color = panel.callPlugin('generate_color', this);
+			this._borderColor = panel.callPlugin('generate_border_color', this);
+		}
 		this._x = x;
 		this._initX = x;
 		this._y = y;
@@ -565,13 +567,13 @@ class GamePlugin {
 	*/
 	checkPlugin(functionName, functionExec) {
 		try {
-			var arg1 = '';
+			var arg1 = null;
 			var arg2 = '';
 			var arg3 = '';
 			eval(functionExec);
 		} catch (e) {
 			console.log(e);
-			$("#error_message").html(functionName + ' : ' + e.message);
+			$("#error_message").html(functionName + '[' + functionExec + '] : ' + e.message);
 			return false;
 		}
 		return true;

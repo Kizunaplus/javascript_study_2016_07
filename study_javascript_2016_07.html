@@ -334,24 +334,6 @@ class Panel {
 		this._height = height;
 		this._message = null;
 		this._plugins = pluginSetting;
-		if ('generate_color' in this._plugins == false) {
-			this._plugins['generate_color'] = 'defaultGenerateColor(arg1);';
-		}
-		if ('generate_border_color' in this._plugins == false) {
-			this._plugins['generate_border_color'] = 'defaultGenerateBorderColor(arg1);';
-		}
-		if ('create_blocks' in this._plugins == false) {
-			this._plugins['create_blocks'] = 'defaultCreateBlocks(arg1, arg1._width, arg1._height);';
-		}
-		if ('calc_score_point' in this._plugins == false) {
-			this._plugins['calc_score_point'] = 'defaultCalcScorePoint(arg1);';
-		}
-		if ('is_hit_block_and_ball' in this._plugins == false) {
-			this._plugins['is_hit_block_and_ball'] = 'defaultIsHitBlockAndBall(arg1, arg2);';
-		}
-		if ('get_status_message' in this._plugins == false) {
-			this._plugins['get_status_message'] = 'defaultGetStatusMessage(arg1, arg2);';
-		}
 		this.create();
 	}
 
@@ -423,12 +405,28 @@ class Panel {
 				return;
 			}
 		}
+		if (this.isGameClear() === true) {
+			this._message = this.callPlugin('get_status_message', this, 3);
+			gameEnd();
+			return;
+		}
 
 		if (this._blocks != null) {
 			for (var i = 0; i < this._blocks.length; i++) {
 				//this._blocks[i].draw();
 			}
 		}
+	}
+
+	isGameClear() {
+		var isGameClearCheck = true;
+		for(var i = 0; i < this._blocks.length; i++) {
+			if (this._blocks[i].Visible == true) {
+				isGameClearCheck = false;
+			}
+		}
+
+		return isGameClearCheck;
 	}
 
 	movePaddle(x) {
